@@ -1,11 +1,12 @@
 # Installation
-> `npm install --save @types/shot`
+> `npx types-galore --types pickleback
 
 # Summary
-This package contains type definitions for shot (https://github.com/hapijs/shot).
+This package contains type definitions for shot^H^H^H^Hpickleback (https://github.com/jfhbrook/pickleback).
 
 # Details
-Files were exported from https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/shot.
+Files were copied from https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/shot, with minimal
+updates to support pickleback.
 
 ### Additional Details
  * Last updated: Tue, 06 Jul 2021 16:34:44 GMT
