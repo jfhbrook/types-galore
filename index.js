@@ -39,40 +39,47 @@ exports.main = void 0;
 const promises_1 = require("fs/promises");
 const path = __importStar(require("path"));
 const minimist_1 = __importDefault(require("minimist"));
-function typeDefinitionsPath(packageName) {
-    return path.join(__dirname, 'types', packageName);
-}
-class Registry {
-    constructor(home) {
-        this.home = home;
-        this.registryJsonPath = path.join(home, 'registry.json');
+class JsonFile {
+    constructor(path) {
+        this.path = path;
     }
-    readRegistryJson() {
+    read() {
         return __awaiter(this, void 0, void 0, function* () {
-            return JSON.parse((yield (0, promises_1.readFile)(this.registryJsonPath)).toString('utf8'));
+            return JSON.parse((yield (0, promises_1.readFile)(this.path)).toString('utf8'));
         });
     }
-    writeRegistryJson(json) {
+    write(json) {
         return __awaiter(this, void 0, void 0, function* () {
-            yield (0, promises_1.writeFile)(this.registryJsonPath, JSON.stringify(json, null, 2));
+            yield (0, promises_1.writeFile)(this.path, JSON.stringify(json, null, 2));
         });
     }
     transaction(fn) {
         return __awaiter(this, void 0, void 0, function* () {
-            let json = yield this.readRegistryJson();
+            let json = yield this.read();
             json = yield fn(json);
-            yield this.writeRegistryJson(json);
+            yield this.write(json);
         });
     }
     with(fn) {
         return __awaiter(this, void 0, void 0, function* () {
-            let json = yield this.readRegistryJson();
+            let json = yield this.read();
             yield fn(json);
         });
     }
+    flatMap(fn) {
+        return __awaiter(this, void 0, void 0, function* () {
+            let json = yield this.read();
+            return fn(json);
+        });
+    }
+}
+class Registry {
+    constructor(registryHome) {
+        this.file = new JsonFile(path.join(registryHome, 'registry.json'));
+    }
     add(pkg, url) {
         return __awaiter(this, void 0, void 0, function* () {
-            yield this.transaction((json) => __awaiter(this, void 0, void 0, function* () {
+            yield this.file.transaction((json) => __awaiter(this, void 0, void 0, function* () {
                 json.definitions[pkg] = url ? url : `${url || json.registryUrl}/types/${pkg}/index.d.ts`;
                 return json;
             }));
@@ -80,12 +87,72 @@ class Registry {
     }
     remove(pkg) {
         return __awaiter(this, void 0, void 0, function* () {
-            yield this.transaction((json) => __awaiter(this, void 0, void 0, function* () {
+            yield this.file.transaction((json) => __awaiter(this, void 0, void 0, function* () {
                 delete json.definitions[pkg];
                 return json;
             }));
         });
     }
+    findDefinitions(dependencies) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const definitions = [];
+            yield this.file.with((json) => __awaiter(this, void 0, void 0, function* () {
+                for (let { name } of dependencies) {
+                    if (json.definitions[name]) {
+                        definitions.push({
+                            name,
+                            url: json.definitions[name]
+                        });
+                    }
+                }
+            }));
+            return definitions;
+        });
+    }
+}
+class Package {
+    constructor(projectHome) {
+        this.file = new JsonFile(path.join(projectHome, 'package.json'));
+    }
+    dependencies() {
+        return __awaiter(this, void 0, void 0, function* () {
+            const json = yield this.file.read();
+            return Object.entries(json.dependencies || {}).map(([name, version]) => {
+                return {
+                    name,
+                    version,
+                    type: 'production'
+                };
+            }).concat(Object.entries(json.devDependencies || {}).map(([name, version]) => {
+                return {
+                    name,
+                    version,
+                    type: 'development'
+                };
+            }));
+        });
+    }
+}
+function install(registry, pkg) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const dependencies = yield pkg.dependencies();
+        const definitions = yield registry.findDefinitions(dependencies);
+        console.log(definitions);
+        /*
+        types-galore install (as a post-install hook):
+      
+        1. look at what packages npm says are dependencies
+        2. look for definitions which match the package name on github
+        3. downloads/unpacks the files with undici
+      
+        types-galore init
+        1. ensures that the types path is specified in tsc config and in typesGalore
+           section of package.json
+      
+        for github stuff: can I generally just copy the index.ts into pkg.ts ? I think
+        so, right? if not, fuck it, bundle all of them
+        */
+    });
 }
 function main(argv) {
     return __awaiter(this, void 0, void 0, function* () {
@@ -127,25 +194,12 @@ function main(argv) {
                 }
                 yield registry.remove(pkg);
                 break;
+            case 'install':
+                yield install(registry, new Package('.'));
+                break;
             default:
                 throw new Error(`unknown command: ${command}`);
         }
-        const install = opts.install ? (Array.isArray(opts.install) ? opts.install : [opts.install]) : [];
-        console.log(install);
     });
 }
 exports.main = main;
-/*
-types-galore install (as a post-install hook):
-
-1. look at what packages npm says are dependencies
-2. look for definitions which match the package name on github
-3. downloads/unpacks the files with undici
-
-types-galore init
-1. ensures that the types path is specified in tsc config and in typesGalore
-   section of package.json
-
-for github stuff: can I generally just copy the index.ts into pkg.ts ? I think
-so, right? if not, fuck it, bundle all of them
-*/
