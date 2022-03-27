@@ -1,0 +1,38 @@
+{
+  "name": "@jfhbrook/types-galore",
+  "version": "1.0.0",
+  "description": "a collection of third-party typescript type stubs",
+  "main": "index.js",
+  "scripts": {
+    "types-galore": "tsc && ./main.js",
+    "pretest": "tsc",
+    "prepublish": "tsc",
+    "test": "tests-of-the-sierra-madre"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/jfhbrook/types-galore.git"
+  },
+  "keywords": [
+    "typescript",
+    "types",
+    "type-definitions",
+    "type",
+    "definitions"
+  ],
+  "author": "Josh Holbrook",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/jfhbrook/types-galore/issues"
+  },
+  "homepage": "https://github.com/jfhbrook/types-galore#readme",
+  "devDependencies": {
+    "@types/minimist": "^1.2.2",
+    "@types/node": "^17.0.23",
+    "tests-of-the-sierra-madre": "^1.0.0",
+    "typescript": "^4.6.3"
+  },
+  "dependencies": {
+    "minimist": "^1.2.6"
+  }
+}

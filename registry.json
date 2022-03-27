@@ -1,0 +1,10 @@
+{
+  "registryUrl": "https://raw.githubusercontent.com/jfhbrook/types-galore/main",
+  "definitions": {
+    "are-we-dev": "https://raw.githubusercontent.com/entropic-dev/boltzmann/latest/types/are-we-dev.d.ts",
+    "culture-ships": "https://raw.githubusercontent.com/entropic-dev/boltzmann/latest/types/culture-ships.d.ts",
+    "@entropic/bole": "https://raw.githubusercontent.com/entropic-dev/boltzmann/latest/types/entropic__bole.d.ts",
+    "honeycomb-beeline": "https://raw.githubusercontent.com/entropic-dev/boltzmann/latest/types/honeycomb-beeline.d.ts",
+    "pickleback": "https://raw.githubusercontent.com/jfhbrook/types-galore/main/types/pickleback/index.d.ts"
+  }
+}
