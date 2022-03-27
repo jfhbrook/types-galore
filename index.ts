@@ -145,6 +145,11 @@ async function install(registry: Registry, pkg: Package) {
   const definitions = await registry.findDefinitions(dependencies);
 
   console.log(definitions);
+
+  // mkdir -p ${pkg.path}/types
+  // for each definition, use undici to download and save the file to
+  // ${pkg.path}/types
+
   /*
   types-galore install (as a post-install hook):
 
