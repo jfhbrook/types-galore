@@ -31,14 +31,11 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.main = void 0;
 const promises_1 = require("fs/promises");
 const path = __importStar(require("path"));
-const minimist_1 = __importDefault(require("minimist"));
+const mrs_commanderson_1 = require("@jfhbrook/mrs-commanderson");
 class JsonFile {
     constructor(path) {
         this.path = path;
@@ -138,6 +135,9 @@ function install(registry, pkg) {
         const dependencies = yield pkg.dependencies();
         const definitions = yield registry.findDefinitions(dependencies);
         console.log(definitions);
+        // mkdir -p ${pkg.path}/types
+        // for each definition, use undici to download and save the file to
+        // ${pkg.path}/types
         /*
         types-galore install (as a post-install hook):
       
@@ -154,51 +154,60 @@ function install(registry, pkg) {
         */
     });
 }
+const app = new mrs_commanderson_1.App({
+    boolean: [
+        'help',
+    ],
+    string: [
+        'registry-path'
+    ],
+    alias: {
+        'help': ['h']
+    },
+    default: {
+        'registry-path': '.'
+    },
+    main(ctx) {
+        return __awaiter(this, void 0, void 0, function* () {
+            if (ctx.help) {
+                console.error('USAGE: types-galore --install PACKAGE');
+                // TODO: Throw an error and have mrs-commanderson show help
+                // appropriately
+                process.exit(0);
+            }
+            ctx.registry = new Registry(ctx['registry-path']);
+        });
+    }
+});
+function addPackage(ctx, pkg, url) {
+    return __awaiter(this, void 0, void 0, function* () {
+    });
+}
+function removePackage(ctx, pkg) {
+    return __awaiter(this, void 0, void 0, function* () {
+    });
+}
+function installPackages(ctx) {
+    return __awaiter(this, void 0, void 0, function* () {
+    });
+}
+app.command('add :pkg', (ctx, pkg) => __awaiter(void 0, void 0, void 0, function* () {
+    yield addPackage(ctx, pkg);
+}));
+app.command('add :pkg :url', (ctx, pkg, url) => __awaiter(void 0, void 0, void 0, function* () {
+    yield addPackage(ctx, pkg, url);
+}));
+app.command('remove :pkg', (ctx, pkg) => __awaiter(void 0, void 0, void 0, function* () {
+    yield removePackage(ctx, pkg);
+}));
+app.command('install', (ctx) => __awaiter(void 0, void 0, void 0, function* () {
+    yield installPackages(ctx);
+}));
 function main(argv) {
     return __awaiter(this, void 0, void 0, function* () {
-        const opts = (0, minimist_1.default)(argv, {
-            boolean: [
-                "help"
-            ],
-            string: [
-                "registry-path"
-            ],
-            alias: {
-                'help': ['h']
-            },
-            default: {
-                'registry-path': '.'
-            }
-        });
-        if (opts.help) {
-            console.error('USAGE: types-galore --install PACKAGE');
-            return;
-        }
-        const registry = new Registry(opts['registry-path']);
-        const command = opts._.shift();
-        let pkg;
-        let url;
-        switch (command) {
-            case 'add':
-                pkg = opts._.shift();
-                url = opts._.shift();
-                if (!pkg) {
-                    throw new Error('must specify a package');
-                }
-                yield registry.add(pkg, url);
-                break;
-            case 'remove':
-                pkg = opts._.shift();
-                if (!pkg) {
-                    throw new Error('must specify a package');
-                }
-                yield registry.remove(pkg);
-                break;
-            case 'install':
-                yield install(registry, new Package('.'));
-                break;
-            default:
-                throw new Error(`unknown command: ${command}`);
+        if (!(yield app.run(argv))) {
+            // TODO: plumb 404 behavior into mrs-commanderson
+            throw new Error(`unknown command`);
         }
     });
 }

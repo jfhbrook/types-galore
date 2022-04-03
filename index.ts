@@ -1,7 +1,8 @@
 import { readFile, writeFile } from 'fs/promises';
 import * as path from 'path';
 
-import minimist from 'minimist';
+import { App } from '@jfhbrook/mrs-commanderson';
+import type { ParsedArgs } from 'minimist';
 
 interface AsyncMapFunction<T, U> {
   (t: T): Promise<U>
@@ -166,55 +167,63 @@ async function install(registry: Registry, pkg: Package) {
   */
 }
 
-export async function main(argv: typeof process.argv) {
-  const opts = minimist(argv, {
-    boolean: [
-      "help"
-    ],
-    string: [
-      "registry-path"
-    ],
-    alias: {
-      'help': ['h']
-    },
-    default: {
-      'registry-path': '.'
-    }
-  });
-
-  if (opts.help) {
-    console.error('USAGE: types-galore --install PACKAGE');
-    return;
-  }
-
-  const registry = new Registry(opts['registry-path']);
-
-  const command = opts._.shift();
-
-  let pkg: string | undefined;
-  let url: string | undefined;
-
-  switch (command) {
-    case 'add':
-      pkg = opts._.shift();
-      url = opts._.shift();
-      if (!pkg) {
-        throw new Error('must specify a package');
-      }
-      await registry.add(pkg, url);
-      break;
-    case 'remove':
-      pkg = opts._.shift();
-      if (!pkg) {
-        throw new Error('must specify a package');
-      }
-      await registry.remove(pkg);
-      break;
-    case 'install':
-      await install(registry, new Package('.'));
-      break;
-    default:
-      throw new Error(`unknown command: ${command}`);
-  }
+interface Context {
+  registry?: Registry
 }
 
+const app = new App<Context>({
+  boolean: [
+    'help',
+  ],
+  string: [
+    'registry-path'
+  ],
+  alias: {
+    'help': ['h']
+  },
+  default: {
+    'registry-path': '.'
+  },
+  async main(ctx) {
+    if (ctx.help) {
+      console.error('USAGE: types-galore --install PACKAGE');
+      // TODO: Throw an error and have mrs-commanderson show help
+      // appropriately
+      process.exit(0);
+    }
+
+    ctx.registry = new Registry(ctx['registry-path']);
+  }
+});
+
+async function addPackage(ctx: ParsedArgs & Context, pkg: string, url?: string) {
+}
+
+async function removePackage(ctx: ParsedArgs & Context, pkg: string) {
+}
+
+async function installPackages(ctx: ParsedArgs & Context) {
+}
+
+app.command('add :pkg', async (ctx, pkg) => {
+  await addPackage(ctx, pkg);
+});
+
+app.command('add :pkg :url', async (ctx, pkg, url) => {
+  await addPackage(ctx, pkg, url);
+});
+
+app.command('remove :pkg', async (ctx, pkg) => {
+  await removePackage(ctx, pkg);
+});
+
+app.command('install', async (ctx) => {
+  await installPackages(ctx)
+});
+
+export async function main(argv: typeof process.argv) {
+  if (!await app.run(argv)) {
+    // TODO: plumb 404 behavior into mrs-commanderson
+    throw new Error(`unknown command`);
+  }
+}
