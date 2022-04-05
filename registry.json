@@ -1,10 +1,43 @@
 {
-  "registryUrl": "https://raw.githubusercontent.com/jfhbrook/types-galore/main",
+  "defaultChannel": "types-galore",
+  "channels": {
+    "types-galore": {
+      "url": "https://raw.githubusercontent.com/jfhbrook/types-galore/main"
+    },
+    "boltzmann": {
+      "url": "https://raw.githubusercontent.com/entropic-dev/boltzmann/latest"
+    }
+  },
   "definitions": {
-    "are-we-dev": "https://raw.githubusercontent.com/entropic-dev/boltzmann/latest/types/are-we-dev.d.ts",
-    "culture-ships": "https://raw.githubusercontent.com/entropic-dev/boltzmann/latest/types/culture-ships.d.ts",
-    "@entropic/bole": "https://raw.githubusercontent.com/entropic-dev/boltzmann/latest/types/entropic__bole.d.ts",
-    "honeycomb-beeline": "https://raw.githubusercontent.com/entropic-dev/boltzmann/latest/types/honeycomb-beeline.d.ts",
-    "pickleback": "https://raw.githubusercontent.com/jfhbrook/types-galore/main/types/pickleback/index.d.ts"
+    "are-we-dev": {
+      "channel": "boltzmann",
+      "files": [
+        "types/are-we-dev.d.ts"
+      ]
+    ],
+    "culture-ships": {
+      "channel": "boltzmann",
+      "files": [
+        "types/culture-ships.d.ts"
+      ]
+    ],
+    "@entropic/bole": {
+      "channel": "boltzmann",
+      "files": [
+        "types/entropic__bole.d.ts"
+      ]
+    ],
+    "honeycomb-beeline": {
+      "channel": "boltzmann",
+      "files": [
+        "types/honeycomb-beeline.d.ts"
+      ]
+    ],
+    "pickleback": {
+      "channel": "types-galore",
+      "files": [
+        "types/pickleback/index.d.ts"
+      ]
+    ]
   }
 }

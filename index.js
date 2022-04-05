@@ -74,18 +74,48 @@ class Registry {
     constructor(registryHome) {
         this.file = new JsonFile(path.join(registryHome, 'registry.json'));
     }
-    add(pkg, url) {
+    addPackage(pkg, channel, files) {
         return __awaiter(this, void 0, void 0, function* () {
             yield this.file.transaction((json) => __awaiter(this, void 0, void 0, function* () {
-                json.definitions[pkg] = url ? url : `${url || json.registryUrl}/types/${pkg}/index.d.ts`;
+                const ch = channel ? channel : json.defaultChannel;
+                json.definitions[pkg] = {
+                    channel: ch,
+                    files: [
+                        'types/${pkg}/index.d.ts'
+                    ]
+                };
                 return json;
             }));
         });
     }
-    remove(pkg) {
+    removePackage(pkg) {
         return __awaiter(this, void 0, void 0, function* () {
             yield this.file.transaction((json) => __awaiter(this, void 0, void 0, function* () {
                 delete json.definitions[pkg];
+                return json;
+            }));
+        });
+    }
+    addChannel(channel, url) {
+        return __awaiter(this, void 0, void 0, function* () {
+            yield this.file.transaction((json) => __awaiter(this, void 0, void 0, function* () {
+                json.channels[channel] = { url };
+                return json;
+            }));
+        });
+    }
+    removeChannel(channel) {
+        return __awaiter(this, void 0, void 0, function* () {
+            yield this.file.transaction((json) => __awaiter(this, void 0, void 0, function* () {
+                delete json.channels[channel];
+                return json;
+            }));
+        });
+    }
+    setDefaultChannel(channel) {
+        return __awaiter(this, void 0, void 0, function* () {
+            yield this.file.transaction((json) => __awaiter(this, void 0, void 0, function* () {
+                json.defaultChannel = channel;
                 return json;
             }));
         });
@@ -96,10 +126,12 @@ class Registry {
             yield this.file.with((json) => __awaiter(this, void 0, void 0, function* () {
                 for (let { name } of dependencies) {
                     if (json.definitions[name]) {
-                        definitions.push({
-                            name,
-                            url: json.definitions[name]
-                        });
+                        for (let file of json.definitions[name].files) {
+                            definitions.push({
+                                name,
+                                url: `${json.channels[name]}/${file}`
+                            });
+                        }
                     }
                 }
             }));
@@ -130,43 +162,17 @@ class Package {
         });
     }
 }
-function install(registry, pkg) {
-    return __awaiter(this, void 0, void 0, function* () {
-        const dependencies = yield pkg.dependencies();
-        const definitions = yield registry.findDefinitions(dependencies);
-        console.log(definitions);
-        // mkdir -p ${pkg.path}/types
-        // for each definition, use undici to download and save the file to
-        // ${pkg.path}/types
-        /*
-        types-galore install (as a post-install hook):
-      
-        1. look at what packages npm says are dependencies
-        2. look for definitions which match the package name on github
-        3. downloads/unpacks the files with undici
-      
-        types-galore init
-        1. ensures that the types path is specified in tsc config and in typesGalore
-           section of package.json
-      
-        for github stuff: can I generally just copy the index.ts into pkg.ts ? I think
-        so, right? if not, fuck it, bundle all of them
-        */
-    });
-}
 const app = new mrs_commanderson_1.App({
     boolean: [
         'help',
     ],
     string: [
-        'registry-path'
+        'file'
     ],
     alias: {
         'help': ['h']
     },
-    default: {
-        'registry-path': '.'
-    },
+    default: {},
     main(ctx) {
         return __awaiter(this, void 0, void 0, function* () {
             if (ctx.help) {
@@ -179,35 +185,108 @@ const app = new mrs_commanderson_1.App({
         });
     }
 });
-function addPackage(ctx, pkg, url) {
-    return __awaiter(this, void 0, void 0, function* () {
-    });
-}
-function removePackage(ctx, pkg) {
-    return __awaiter(this, void 0, void 0, function* () {
-    });
-}
-function installPackages(ctx) {
-    return __awaiter(this, void 0, void 0, function* () {
-    });
-}
+/*
+ * types-galore add PACKAGE <CHANNEL>
+ */
+app.command('add', (ctx) => __awaiter(void 0, void 0, void 0, function* () {
+    throw new Error('USAGE: types-galore add PACKAGE <CHANNEL>');
+}));
 app.command('add :pkg', (ctx, pkg) => __awaiter(void 0, void 0, void 0, function* () {
     yield addPackage(ctx, pkg);
 }));
-app.command('add :pkg :url', (ctx, pkg, url) => __awaiter(void 0, void 0, void 0, function* () {
-    yield addPackage(ctx, pkg, url);
+app.command('add :pkg :channel', (ctx, pkg, channel) => __awaiter(void 0, void 0, void 0, function* () {
+    yield addPackage(ctx, pkg, channel);
+}));
+function addPackage(ctx, pkg, channel) {
+    return __awaiter(this, void 0, void 0, function* () {
+        if (!ctx.registry) {
+            throw new Error('assert: registry is initialized');
+        }
+        yield ctx.registry.addPackage(pkg, channel, ctx.file instanceof Array ? ctx.file : [ctx.file]);
+    });
+}
+/*
+ * types-galore remove PACKAGE
+ */
+app.command('remove', (ctx) => __awaiter(void 0, void 0, void 0, function* () {
+    throw new Error('USAGE: types-galore remove PACKAGE');
 }));
 app.command('remove :pkg', (ctx, pkg) => __awaiter(void 0, void 0, void 0, function* () {
-    yield removePackage(ctx, pkg);
+    if (!ctx.registry) {
+        throw new Error('assert: registry is initialized');
+    }
+    yield ctx.registry.removePackage(pkg);
 }));
+/*
+ * types-galore channel commands
+ */
+app.command('channel', (ctx) => __awaiter(void 0, void 0, void 0, function* () {
+    throw new Error('available commands: add, remove, default');
+}));
+app.command('channel add', (ctx) => __awaiter(void 0, void 0, void 0, function* () {
+    throw new Error('USAGE: types-galore channel add NAME URL');
+}));
+app.command('channel add :name', (ctx) => __awaiter(void 0, void 0, void 0, function* () {
+    throw new Error('USAGE: types-galore channel add NAME URL');
+}));
+app.command('channel add :name :url', (ctx, name, url) => __awaiter(void 0, void 0, void 0, function* () {
+    if (!ctx.registry) {
+        throw new Error('assert: registry is initialized');
+    }
+    yield ctx.registry.addChannel(name, url);
+}));
+app.command('channel remove', (ctx) => __awaiter(void 0, void 0, void 0, function* () {
+    throw new Error('USAGE: types-galore channel remove NAME');
+}));
+app.command('channel remove :name', (ctx, name) => __awaiter(void 0, void 0, void 0, function* () {
+    if (!ctx.registry) {
+        throw new Error('assert: registry is initialized');
+    }
+    yield ctx.registry.removeChannel(name);
+}));
+app.command('channel default', (ctx) => __awaiter(void 0, void 0, void 0, function* () {
+    throw new Error('USAGE: types-galore channel default NAME');
+}));
+app.command('channel default :name', (ctx, name) => __awaiter(void 0, void 0, void 0, function* () {
+    if (!ctx.registry) {
+        throw new Error('assert: registry is initialized');
+    }
+    yield ctx.registry.setDefaultChannel(name);
+}));
+/*
+ * Install stuff!
+ */
 app.command('install', (ctx) => __awaiter(void 0, void 0, void 0, function* () {
-    yield installPackages(ctx);
+    if (!ctx.registry) {
+        throw new Error('assert: registry is initialized');
+    }
+    const pkg = new Package(process.cwd());
+    const dependencies = yield pkg.dependencies();
+    const definitions = yield ctx.registry.findDefinitions(dependencies);
+    console.log(definitions);
+    // mkdir -p ${pkg.path}/types
+    // for each definition, use undici to download and save the file to
+    // ${pkg.path}/types
+    /*
+    types-galore install (as a post-install hook):
+  
+    1. look at what packages npm says are dependencies
+    2. look for definitions which match the package name on github
+    3. downloads/unpacks the files with undici
+  
+    types-galore init
+    1. ensures that the types path is specified in tsc config and in typesGalore
+       section of package.json
+  
+    for github stuff: can I generally just copy the index.ts into pkg.ts ? I think
+    so, right? if not, fuck it, bundle all of them
+    */
 }));
 function main(argv) {
     return __awaiter(this, void 0, void 0, function* () {
         if (!(yield app.run(argv))) {
             // TODO: plumb 404 behavior into mrs-commanderson
-            throw new Error(`unknown command`);
+            throw new Error(`unknown command: ${argv.join(' ')}`);
         }
     });
 }

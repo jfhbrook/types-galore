@@ -43,13 +43,19 @@ class JsonFile<T> {
   }
 }
 
-interface DefinitionsJson {
-  [pkg: string]: string;
+interface ChannelJson {
+  url: string;
+}
+
+interface DefinitionJson {
+  channel: string;
+  files: string[];
 }
 
 interface RegistryJson {
-  registryUrl: string;
-  definitions: DefinitionsJson;
+  defaultChannel: string,
+  channels: Record<string, ChannelJson>;
+  definitions: Record<string, DefinitionJson>;
 }
 
 interface Definition {
@@ -64,16 +70,45 @@ class Registry {
     this.file = new JsonFile<RegistryJson>(path.join(registryHome, 'registry.json'));
   }
 
-  async add(pkg: string, url?: string): Promise<void> {
+  async addPackage(pkg: string, channel?: string, files?: string[]): Promise<void> {
     await this.file.transaction(async (json: RegistryJson) => {
-      json.definitions[pkg] = url ? url : `${url || json.registryUrl}/types/${pkg}/index.d.ts`;
-      return json
+      const ch = channel ? channel : json.defaultChannel;
+
+      json.definitions[pkg] = {
+        channel: ch,
+        files: [
+          'types/${pkg}/index.d.ts'
+        ]
+      };
+
+      return json;
     });
   }
 
-  async remove(pkg: string): Promise<void> {
+  async removePackage(pkg: string): Promise<void> {
     await this.file.transaction(async (json: RegistryJson) => {
       delete json.definitions[pkg];
+      return json;
+    });
+  }
+
+  async addChannel(channel: string, url: string): Promise<void> {
+    await this.file.transaction(async (json: RegistryJson) => {
+      json.channels[channel] = { url };
+      return json;
+    });
+  }
+
+  async removeChannel(channel: string): Promise<void> {
+    await this.file.transaction(async (json: RegistryJson) => {
+      delete json.channels[channel];
+      return json;
+    });
+  }
+
+  async setDefaultChannel(channel: string): Promise<void> {
+    await this.file.transaction(async (json: RegistryJson) => {
+      json.defaultChannel = channel;
       return json;
     });
   }
@@ -84,10 +119,12 @@ class Registry {
     await this.file.with(async (json) => {
       for (let { name } of dependencies) {
         if (json.definitions[name]) {
-          definitions.push({
-            name,
-            url: json.definitions[name]
-          });
+          for (let file of json.definitions[name].files) {
+            definitions.push({
+              name,
+              url: `${json.channels[name]}/${file}`
+            });
+          }
         }
       }
     });
@@ -141,9 +178,126 @@ class Package {
   }
 }
 
-async function install(registry: Registry, pkg: Package) {
+interface Context {
+  registry?: Registry
+}
+
+const app = new App<Context>({
+  boolean: [
+    'help',
+  ],
+  string: [
+    'file'
+  ],
+  alias: {
+    'help': ['h']
+  },
+  default: {
+  },
+  async main(ctx) {
+    if (ctx.help) {
+      console.error('USAGE: types-galore --install PACKAGE');
+      // TODO: Throw an error and have mrs-commanderson show help
+      // appropriately
+      process.exit(0);
+    }
+
+    ctx.registry = new Registry(ctx['registry-path']);
+  }
+});
+
+/*
+ * types-galore add PACKAGE <CHANNEL>
+ */
+app.command('add', async (ctx: ParsedArgs & Context) => {
+  throw new Error('USAGE: types-galore add PACKAGE <CHANNEL>');
+});
+
+app.command('add :pkg', async (ctx, pkg) => {
+  await addPackage(ctx, pkg);
+});
+
+app.command('add :pkg :channel', async (ctx, pkg, channel) => {
+  await addPackage(ctx, pkg, channel);
+});
+
+async function addPackage(ctx: ParsedArgs & Context, pkg: string, channel?: string) {
+  if (!ctx.registry) {
+    throw new Error('assert: registry is initialized');
+  }
+  await ctx.registry.addPackage(pkg, channel, ctx.file instanceof Array ? ctx.file : [ctx.file]);
+}
+
+/*
+ * types-galore remove PACKAGE
+ */
+
+app.command('remove', async (ctx: ParsedArgs & Context) => {
+  throw new Error('USAGE: types-galore remove PACKAGE');
+});
+
+app.command('remove :pkg', async (ctx: ParsedArgs & Context, pkg: string) => {
+  if (!ctx.registry) {
+    throw new Error('assert: registry is initialized');
+  }
+  await ctx.registry.removePackage(pkg);
+});
+
+/*
+ * types-galore channel commands
+ */
+
+app.command('channel', async (ctx: ParsedArgs & Context) => {
+  throw new Error('available commands: add, remove, default');
+});
+
+app.command('channel add', async (ctx: ParsedArgs & Context) => {
+  throw new Error('USAGE: types-galore channel add NAME URL');
+});
+
+app.command('channel add :name', async (ctx: ParsedArgs & Context) => {
+  throw new Error('USAGE: types-galore channel add NAME URL');
+});
+
+app.command('channel add :name :url', async (ctx: ParsedArgs & Context, name: string, url: string) => {
+  if (!ctx.registry) {
+    throw new Error('assert: registry is initialized');
+  }
+  await ctx.registry.addChannel(name, url);
+});
+
+app.command('channel remove', async (ctx: ParsedArgs & Context) => {
+  throw new Error('USAGE: types-galore channel remove NAME');
+});
+
+app.command('channel remove :name', async (ctx: ParsedArgs & Context, name: string) => {
+  if (!ctx.registry) {
+    throw new Error('assert: registry is initialized');
+  }
+  await ctx.registry.removeChannel(name);
+});
+
+app.command('channel default', async (ctx: ParsedArgs & Context) => {
+  throw new Error('USAGE: types-galore channel default NAME');
+});
+
+app.command('channel default :name', async (ctx: ParsedArgs & Context, name: string) => {
+  if (!ctx.registry) {
+    throw new Error('assert: registry is initialized');
+  }
+  await ctx.registry.setDefaultChannel(name);
+});
+
+/*
+ * Install stuff!
+ */
+app.command('install', async (ctx: ParsedArgs & Context) => {
+  if (!ctx.registry) {
+    throw new Error('assert: registry is initialized');
+  }
+  const pkg = new Package(process.cwd());
   const dependencies = await pkg.dependencies();
-  const definitions = await registry.findDefinitions(dependencies);
+  const definitions = await ctx.registry.findDefinitions(dependencies);
 
   console.log(definitions);
 
@@ -165,65 +319,12 @@ async function install(registry: Registry, pkg: Package) {
   for github stuff: can I generally just copy the index.ts into pkg.ts ? I think
   so, right? if not, fuck it, bundle all of them
   */
-}
 
-interface Context {
-  registry?: Registry
-}
-
-const app = new App<Context>({
-  boolean: [
-    'help',
-  ],
-  string: [
-    'registry-path'
-  ],
-  alias: {
-    'help': ['h']
-  },
-  default: {
-    'registry-path': '.'
-  },
-  async main(ctx) {
-    if (ctx.help) {
-      console.error('USAGE: types-galore --install PACKAGE');
-      // TODO: Throw an error and have mrs-commanderson show help
-      // appropriately
-      process.exit(0);
-    }
-
-    ctx.registry = new Registry(ctx['registry-path']);
-  }
-});
-
-async function addPackage(ctx: ParsedArgs & Context, pkg: string, url?: string) {
-}
-
-async function removePackage(ctx: ParsedArgs & Context, pkg: string) {
-}
-
-async function installPackages(ctx: ParsedArgs & Context) {
-}
-
-app.command('add :pkg', async (ctx, pkg) => {
-  await addPackage(ctx, pkg);
-});
-
-app.command('add :pkg :url', async (ctx, pkg, url) => {
-  await addPackage(ctx, pkg, url);
-});
-
-app.command('remove :pkg', async (ctx, pkg) => {
-  await removePackage(ctx, pkg);
-});
-
-app.command('install', async (ctx) => {
-  await installPackages(ctx)
 });
 
 export async function main(argv: typeof process.argv) {
   if (!await app.run(argv)) {
     // TODO: plumb 404 behavior into mrs-commanderson
-    throw new Error(`unknown command`);
+    throw new Error(`unknown command: ${argv.join(' ')}`);
   }
 }
